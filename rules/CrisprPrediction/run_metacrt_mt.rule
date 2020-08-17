@@ -1,0 +1,19 @@
+rule run_metacrt_mt_contigs:
+    input:
+        "%s/{ts_sample}/Assembly/mt.megahit_preprocessed.1/final.contigs.fa" % TS_DIR,
+        "%s/{ts_sample}/Assembly/mt.megahit_unmapped.2/final.contigs.fa" % TS_DIR
+    output:
+        "ALL/{ts_sample}/metacrt_contigs-mt/metacrt_contigs-mt.out",
+        "ALL/{ts_sample}/metacrt_contigs-mt/metacrt_contigs-mt_repeats.fa",
+        "ALL/{ts_sample}/metacrt_contigs-mt/metacrt_contigs-mt_spacers.fa",
+        "ALL/{ts_sample}/metacrt_contigs-mt/metacrt_contigs-mt_crispr.fa",
+        "ALL/{ts_sample}/metacrt_contigs-mt/metacrt_contigs-mt_crispr.ann"
+    shell:
+        """
+        java -cp {ESB_TOOLS_DIR}/metaCRT/metaCRT.jar crt <(cat {input[0]} {input[1]}) {output[0]} 
+        python2 {ESB_TOOLS_DIR}/metaCRT/summarize-crispr-new.py -f {output[0]} -repeat {output[1]} -spacer {output[2]} -crispr {output[3]} -crisprann {output[4]}
+        sed -i "s/^>/>metacrt_contigs-mt_{wildcards.ts_sample}_/" {output[1]}
+        sed -i "s/^>/>metacrt_contigs-mt_{wildcards.ts_sample}_/" {output[2]}
+        sed -i "s/^>/>metacrt_contigs-mt_{wildcards.ts_sample}_/" {output[3]}
+        sed -i "s/^>/>metacrt_contigs-mt_{wildcards.ts_sample}_/" {output[4]}
+        """

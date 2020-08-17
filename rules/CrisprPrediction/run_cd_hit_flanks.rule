@@ -1,0 +1,23 @@
+rule merge_flanks:
+    input:
+        expand("ALL/{ts_sample}/crass_mg-reads/crass_mg-reads_{ts_sample}_flanks.fa", ts_sample = TS_SAMPLES),
+        expand("ALL/{ts_sample}/crass_mt-reads/crass_mt-reads_{ts_sample}_flanks.fa", ts_sample = TS_SAMPLES),
+        "ALL/metaCRT/metacrt_contigs-mgmt_flanks.fa"
+    output:
+        "ALL/flanks/ALL_flanks.fa",
+        "ALL/flanks/ALL_flanks-merged.fa",
+        "ALL/flanks/ALL_flanks-merged.fa.clstr",
+        "ALL/flanks/ALL_flanks-merged.fa.tbl",
+        "ALL/flanks/ALL_flanks-merged.fa.tbl2seq"
+    shell:
+        """
+        cat {input} > {output[0]}
+        sed -i "s/^>_/>/g" {output[0]}
+        cd-hit-est -T {THREADS} -M $(({MEMTOTAL}*1000)) -i {output[0]} -o {output[1]} -c 0.99 -d 0 -aL 0.975 -aS 0.975 -s 0.975
+        
+        # cd-hit-lap -i {output[0]} -o {output[1]} 
+        
+        # This provides a tables for the mappings for the clustered sequences
+        clstr_sql_tbl.pl {output[2]} {output[3]}
+        join -1 1 -2 3 -t$'\t' <(paste <(grep "^>" {output[2]} | sed -e "s/>Cluster //g") <(grep "\*" {output[2]} | cut -f2 -d " " | sed -e "s/>//g" | sed -e "s/\.\.\.//g")) <(cat {output[3]}) > {output[4]}
+        """

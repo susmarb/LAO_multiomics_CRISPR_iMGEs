@@ -1,0 +1,18 @@
+rule run_virsorter_mt:
+    input:
+        "%s/{ts_sample}/Assembly/mt.megahit_preprocessed.1.fa" % TS_DIR,
+        "%s/{ts_sample}/Assembly/mt.megahit_unmapped.2.fa" % TS_DIR,
+    output:
+        "VirSorter/{ts_sample}/MT/Readme.txt",
+        "VirSorter/{ts_sample}/MT/{ts_sample}_mt.done",
+        "VirSorter/{ts_sample}/MT/VIRSorter_global-phage-signal.csv" 
+    shell:
+        """
+        mkdir -p VirSorter/{wildcards.ts_sample}/MT
+        cat {input} > VirSorter/{wildcards.ts_sample}/MT/mt-megahit-all.fa
+        source activate virsorter
+
+        {ESB_TOOLS_DIR}/VirSorter/VirSorter/wrapper_phage_contigs_sorter_iPlant.pl -f VirSorter/{wildcards.ts_sample}/MT/mt-megahit-all.fa --db 1 --wdir {MGE_OUTDIR}/VirSorter/{wildcards.ts_sample}/MT --ncpu 1 --data-dir {MGE_OUTDIR}/VirSorter/{wildcards.ts_sample}/MT
+        source deactivate
+        touch {output}
+        """

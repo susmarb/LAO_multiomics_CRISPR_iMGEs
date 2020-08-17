@@ -1,0 +1,159 @@
+---
+title: "Gene profiles"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries
+```{r}
+packs <- c("tidyr", "dplyr", "readr", "stringr", "tibble", "ggplot2", "viridis")
+for (i in 1:length(packs))
+{
+  library(packs[i], character.only = TRUE)
+}
+```
+
+## Data: MG
+```{r}
+cas_mg.in <- "/Users/susana.martinez/Documents/LAO_TS_analysis/Proteins_clstr/clusterRes_cluster_cas_mg.tsv"
+cas_mg <- read_tsv(cas_mg.in)
+TPs <- cas_mg %>% select(date) %>% unique()
+
+cas_mg %>%
+  filter(!grepl("2010-10-04", date), !grepl("2011-01-25", date)) %>%
+  ggplot(aes(x = date, y = sum_mg, fill = cas)) + 
+  #geom_bar(stat = "identity") +
+  geom_area(stat = "identity", alpha = 0.8) +
+  theme_classic() +
+  scale_x_date(breaks = TPs$date) +
+  scale_fill_viridis_d() + 
+  theme(axis.text.x = element_text(angle = 90, size = 12),
+        axis.text.y = element_text(size = 12),
+        strip.background = element_blank(),
+        axis.title.y = element_text(size = 12),
+        strip.placement = "outside",
+        axis.title.x=element_text(size = 12),
+        axis.ticks.x=element_blank(),
+        legend.position = "none") 
+# "normalize" cas abundace to percentages
+cas_mg %>% select(cas) %>% unique() %>% as.data.frame() %>% View(.)
+cas_mg %>%
+  filter(!grepl("2010-10-04", date), !grepl("2011-01-25", date)) %>% 
+  mutate(type = case_when(cas == "cas3" ~ "Type-I", 
+                          cas == "cas10" ~ "Type-III",
+                          grepl("csf", cas) ~ "Type-IV",
+                          cas == "DinG" ~ "Type-IV",
+                          cas == "cas9" ~ "Type-II", 
+                          grepl("cpf1", cas) ~ "Type-V",
+                          grepl("cas13", cas) ~ "Type-VI")) %>% 
+  group_by(date) %>% 
+  mutate(total = sum(sum_mg)) %>% 
+  ungroup() %>% 
+  mutate(mg_rel = sum_mg*100/total) %>% 
+  #select(date, cas, mg_rel) %>% 
+  mutate(type = ifelse(is.na(type), "Non-signature", type)) %>% 
+  filter(type != "Non-signature") %>% 
+  group_by(date, type) %>% 
+  mutate(type_mg = sum(mg_rel)) %>% 
+  ungroup() %>% 
+  select(date, type, type_mg) %>% unique() %>% 
+  ggplot(aes(x = date, y = type_mg, fill = type)) + 
+  geom_area(stat = "identity", alpha = 0.7) +
+  theme_classic() +
+  scale_x_date(breaks = TPs$date) +
+  scale_fill_manual(values = c("Type-I" = "mediumorchid1", 
+                               "Type-II" = "mediumorchid3", 
+                               "Type-III" = "mediumorchid4", 
+                               "Type-IV" = "hotpink3",
+                               "Type-V" = "mediumpurple4",
+                               "Type-VI" = "hotpink4",
+                               "Non-signature" = "gray90")) +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 12),
+        strip.background = element_blank(),
+        axis.title.y = element_text(size = 12),
+        strip.placement = "outside",
+        axis.title.x=element_text(size = 12),
+        axis.ticks.x=element_blank(),
+        legend.position = "right") -> mg_plot
+
+```
+
+
+## Data: MT
+```{r}
+cas_mt.in <- "/Users/susana.martinez/Documents/LAO_TS_analysis/Proteins_clstr/clusterRes_cluster_cas_mt.tsv"
+cas_mt <- read_tsv(cas_mt.in)
+TPs <- cas_mt %>% select(date) %>% unique()
+
+cas_mt %>%
+  filter(!grepl("2010-10-04", date), !grepl("2011-01-25", date)) %>%
+  ggplot(aes(x = date, y = sum_mt, fill = cas)) + 
+  #geom_bar(stat = "identity") +
+  geom_area(stat = "identity", alpha = 0.8) +
+  theme_classic() +
+  scale_x_date(breaks = TPs$date) +
+  scale_fill_viridis_d() + 
+  theme(axis.text.x = element_text(angle = 90, size = 12),
+        axis.text.y = element_text(size = 12),
+        strip.background = element_blank(),
+        axis.title.y = element_text(size = 12),
+        strip.placement = "outside",
+        axis.title.x=element_text(size = 12),
+        axis.ticks.x=element_blank(),
+        legend.position = "none") 
+# "normalize" cas abundace to percentages
+cas_mt %>% select(cas) %>% unique() %>% as.data.frame() %>% View(.)
+cas_mt %>%
+  filter(!grepl("2010-10-04", date), !grepl("2011-01-25", date)) %>% 
+  mutate(type = case_when(cas == "cas3" ~ "Type-I", 
+                          cas == "cas10" ~ "Type-III",
+                          grepl("csf", cas) ~ "Type-IV",
+                          cas == "DinG" ~ "Type-IV",
+                          cas == "cas9" ~ "Type-II", 
+                          grepl("cpf1", cas) ~ "Type-V",
+                          grepl("cas13", cas) ~ "Type-VI")) %>% 
+  group_by(date) %>% 
+  mutate(total = sum(sum_mt)) %>% 
+  ungroup() %>% 
+  mutate(mt_rel = sum_mt*100/total) %>% 
+  #select(date, cas, mg_rel) %>% 
+  mutate(type = ifelse(is.na(type), "Non-signature", type)) %>% 
+    filter(type != "Non-signature") %>% 
+  group_by(date, type) %>% 
+  mutate(type_mt = sum(mt_rel)) %>% 
+  ungroup() %>% 
+  select(date, type, type_mt) %>% unique() %>% 
+  ggplot(aes(x = date, y = type_mt, fill = type)) + 
+  geom_area(stat = "identity", alpha = 0.7) +
+  theme_classic() +
+  scale_x_date(breaks = TPs$date) +
+  scale_fill_manual(values = c("Type-I" = "mediumorchid1", 
+                               "Type-II" = "mediumorchid3", 
+                               "Type-III" = "mediumorchid4", 
+                               "Type-IV" = "hotpink3",
+                               "Type-V" = "mediumpurple4",
+                               "Type-VI" = "hotpink4",
+                               "Non-signature" = "gray90")) +
+  theme(axis.text.x = element_text(angle = 90, size = 12),
+        axis.text.y = element_text(size = 12),
+        strip.background = element_blank(),
+        axis.title.y = element_text(size = 12),
+        strip.placement = "outside",
+        axis.title.x=element_text(size = 12),
+        axis.ticks.x=element_blank(),
+        legend.position = "right") -> mt_plot
+
+```
+## Save plots
+```{r}
+library(egg)
+
+pdf("/Users/susana.martinez/Documents/LAO_TS_analysis/Proteins_clstr/cas_type_plots.pdf", height = 13/2.56, width = 30/2.56)
+ggarrange(mg_plot, mt_plot)
+dev.off()
+```
+

@@ -1,0 +1,9 @@
+rule run_filter_virfinder_mt:
+    input:
+        "{ts_sample}/VirFinder_predicted_phages_mt_all.tsv",
+    output:
+        "{ts_sample}/VirFinder_predicted_phages_mt_pval001.tsv",
+    shell:
+        """
+            /opt/apps/resif/devel/v1.1-20150414/core/software/lang/R/3.3.0-ictce-7.3.5-bare/bin/Rscript {SRCDIR}/VirFinder_phage_filter_results.R {input} {output}
+        """

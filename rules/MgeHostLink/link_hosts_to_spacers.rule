@@ -1,0 +1,14 @@
+rule link_hosts_to_spacers:
+    input:
+        host = "Hosts_FLDR4SP.tsv",
+        sp_clstr = "%s/spacers/ALL_spacers-merged.fa.tbl2seq" % CRISPR_ELEMENTS_DIR,
+        previous = "identification_host.done"
+    output:
+        host_sp = "Hosts_SP.tsv",
+        done = "link_hosts_to_spacers.done"
+    shell:
+        """
+        source {SRCDIR}/R_env.sh
+        Rscript {SRCDIR}/link_host_spacer.R {input.host} {input.sp_clstr} {output.host_sp}
+        touch {output}
+        """

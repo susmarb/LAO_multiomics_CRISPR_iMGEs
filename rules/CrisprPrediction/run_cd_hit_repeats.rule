@@ -1,0 +1,23 @@
+rule merge_repeats:
+    input:
+        expand("ALL/{ts_sample}/crass_mt-reads/crass_mt-reads_{ts_sample}_repeats.fa", ts_sample = TS_SAMPLES),
+        expand("ALL/{ts_sample}/crass_mg-reads/crass_mg-reads_{ts_sample}_repeats.fa", ts_sample = TS_SAMPLES),
+        expand("ALL/{ts_sample}/metacrt_contigs-mt/metacrt_contigs-mt_repeats.fa", ts_sample = TS_SAMPLES),
+        "ALL/metaCRT/metacrt_contigs-mgmt_repeats.fa"
+    output:
+        "ALL/repeats/ALL_repeats.fa",
+        "ALL/repeats/ALL_repeats-merged.fa",
+        "ALL/repeats/ALL_repeats-merged.fa.clstr",
+        "ALL/repeats/ALL_repeats-merged.fa.tbl",
+        "ALL/repeats/ALL_repeats-merged.fa.tbl2seq"
+    shell:
+       """
+       cat {input} > {output[0]}
+       sed -i "s/^>_/>/g" {output[0]}
+
+       cd-hit-est -i {output[0]} -o {output[1]} -c 0.8 -d 0 -s 0.75
+
+       # This provides a tables for the mappings for the clustered sequences
+       clstr_sql_tbl.pl {output[2]} {output[3]}
+       join -1 1 -2 3 -t$'\t' <(paste <(grep "^>" {output[2]} | sed -e "s/>Cluster //g") <(grep "\*" {output[2]} | cut -f2 -d " " | sed -e "s/>//g" | sed -e "s/\.\.\.//g")) <(cat {output[3]}) > {output[4]}
+       """

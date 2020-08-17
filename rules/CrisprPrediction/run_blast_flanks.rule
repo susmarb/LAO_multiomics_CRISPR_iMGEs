@@ -1,0 +1,18 @@
+rule blast_flanks:
+    input:
+        fa = "ALL/flanks/ALL_flanks-merged.fa",
+        so = "db/ALL-mgmt.assembly.merged.fa",
+        sp = "ALL/spacers/blast_spacers.done", 
+        done = "db/formatdb.done"
+    output:
+        blastout = "ALL/flanks/ALL_flanks-merged_x_ALL_MGMT.assembly.merged.tsv",
+        done = "ALL/flanks/blast_flanks.done"
+    shell:
+        """
+        FILESIZE=$(stat -c%s "{input.fa}")
+        BSIZE=$(echo $(($FILESIZE/{THREADS}/2)))
+
+        cat {input.fa} | parallel --gnu --plain -j {THREADS} --block ${{BSIZE}} --recstart '>' --pipe blastn -query - -db {input.so} -task 'blastn' -outfmt "6\ qseqid\ sseqid\ pident\ length\ mismatch\ gapopen\ qstart\ qend\ qlen\ qcovs\ sstart\ send\ slen\ evalue\ bitscore" >> {output.blastout}
+        sed -i '1i qseqid\tsseqid\tpident\tlength\tmismatch\tgapopen\tqstart\tqend\tqlen\tqcovs\tsstart\tsend\tslen\tevalue\tbitscore' {output.blastout}
+        touch {output.done}
+        """

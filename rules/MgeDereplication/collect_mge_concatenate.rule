@@ -1,0 +1,19 @@
+rule collect_mge_concatenate:
+    input:
+        pspcc = "../CRISPR_prediction/ALL/protospacers/ALL_pspcc_qcov95_pident95.gff",
+        vsort = "ALL_VirSorter_id_contigs.txt",
+        vfind = "ALL_VirFinder_id_contigs.txt",
+        pf = "ALL_PlasFlow_id_contigs.txt",
+        pc = "ALL_cBar_id_contigs.txt"
+    output:
+        pspccs = "ALL_PSpCC_id_contigs.txt",
+        mges = "ALL_MGEs.txt"
+    shell:
+        """
+        ## protospacer containing contig ids
+        cut -f 1 {input.pspcc} | tail -n +2 | sort | uniq > {output.pspccs}
+
+        ## concatenate all the ids and remove redundancy
+        cat {input.vsort} {input.vfind} {input.pf} {input.pc} {output.pspccs} | sort | uniq | grep -v "_S_" > {output.mges}
+       
+        """

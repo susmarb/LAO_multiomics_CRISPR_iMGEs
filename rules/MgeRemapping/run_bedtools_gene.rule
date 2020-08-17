@@ -1,0 +1,34 @@
+rule call_gene_depth:
+    input:
+        "Annotations/ALL_MGEs_annotation.gff",
+        "Mappings/{ts_sample}.{type}.reads.sorted.bam"
+    output:
+        "Calculations/GeneLevel/{ts_sample}.{type}.annotation.bed.txt",
+        "Calculations/GeneLevel/{ts_sample}.{type}.gene_depth_hist.txt",
+        "Calculations/GeneLevel/{ts_sample}.{type}.gene_depth_avg.txt",
+        "Calculations/GeneLevel/{ts_sample}.{type}.gene_len.txt"
+    shell:
+        """
+        mkdir -p Calculations/GeneLevel
+
+        coverageBed -hist -abam {input[1]} -b {input[0]} | grep -v "^all" > {output[0]}
+        paste <(cat {output[0]} | cut -f9 | cut -f1 -d \";\" | sed -e \"s/ID=//g\") \
+        <(cut -f10,11,12,13 {output[0]}) > {output[1]}
+        ## This code was adapted and modified from the CONCOCT script to calculate depth
+        ## It prints out a file that contains the average depth of all the genes
+        awk -v OFS='\t' 'BEGIN {{pc=""}}
+        {{
+            c=$1;
+            if (c == pc) {{
+                    cov=cov+$2*$5;
+            }} else {{
+                print pc,cov;
+                cov=$2*$5;
+                pc=c
+            }}
+        }} END {{print pc,cov}}' < {output[1]} | tail -n +2 > {output[2]}
+        # Record gene length file
+        cut -f 1,4 {output[1]} | uniq > {output[3]}
+        """
+        
+       

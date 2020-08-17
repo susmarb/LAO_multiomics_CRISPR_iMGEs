@@ -1,0 +1,12 @@
+rule link_spacer_to_type:
+    input:
+        sp2date = "%s/spacers/ALL_spacers-merged.date.tsv" % CRISPR_ELEMENTS_DIR,
+        sp2pspcc = "ALL_Spacers_to_PsPCC.tsv",
+        pspcc_type = "../MGE_dereplication/ALL_MGEcontigs_class.tsv"
+    output:
+        sp2type = "ALL_spacers-merged.targetType.tsv"
+    shell:
+        """
+        source {SRCDIR}/R_env.sh
+        Rscript {SRCDIR}/sp2type.R {input.sp2date} {input.sp2pspcc} {input.pspcc_type} {output.sp2type}
+        """

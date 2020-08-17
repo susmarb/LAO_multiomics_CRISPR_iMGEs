@@ -1,0 +1,39 @@
+rule run_plasflow:
+    input:
+        "%s/Assemblies/{ts_sample}-mgmt.assembly.merged.fa" % TS_DIR,
+        "VirFinder/{ts_sample}/{ts_sample}_mt_unmapped.done"
+    output:
+        "PlasFlow/{ts_sample}/PlasFlow_mgmt_plasmids.tsv",
+        "PlasFlow/{ts_sample}/PlasFlow_mgmt_plasmids.tsv_chromosomes.fasta",
+        "PlasFlow/{ts_sample}/PlasFlow_mgmt_plasmids.tsv_plasmids.fasta",
+        "PlasFlow/{ts_sample}/PlasFlow_mgmt_plasmids.tsv_unclassified.fasta",
+        "PlasFlow/{ts_sample}/{ts_sample}_mgmt.done"
+    shell:
+        """
+        source {ESB_TOOLS_DIR}/PlasFlow/plasflow_env/bin/activate {ESB_TOOLS_DIR}/PlasFlow/plasflow_env
+        source {SRCDIR}/parallel_function.sh
+
+        rm -rf tmp_plasf
+        mkdir -p PlasFlow/{wildcards.ts_sample} tmp_plasf
+
+        #filter fasta file by seqs => 1000
+        perl {ESB_TOOLS_DIR}/PlasFlow/filter_sequences_by_length.pl \
+        -input {input[0]} \
+        -output tmp_plasf/{wildcards.ts_sample}-mgmt.assembly.merged_filtered.fasta \
+        -thresh 1000
+        
+        #split fasta file
+        NSEQS=$(( $( grep -c \> tmp_plasf/{wildcards.ts_sample}-mgmt.assembly.merged_filtered.fasta)/ ({THREADS}+1)))
+
+        awk 'BEGIN {{n_seq=0;}} /^>/ {{if(n_seq%"'"$NSEQS"'"==0){{file=sprintf("tmp_plasf/{wildcards.ts_sample}-mgmt.assembly.merged_%d_p.fa",n_seq);}} print >> file; n_seq++; next;}} {{ print >> file; }}' < tmp_plasf/{wildcards.ts_sample}-mgmt.assembly.merged_filtered.fasta
+
+        # run plasflow in parallel
+        for f in `ls tmp_plasf/{wildcards.ts_sample}-mgmt.assembly.merged_*_p.fa` ; do
+            echo $f
+            {ESB_TOOLS_DIR}/PlasFlow/plasflow_env/bin/PlasFlow.py --input ${{f}} --output {output[0]} &
+            pwait {THREADS}
+        done
+        wait
+        
+        touch {output}
+        """

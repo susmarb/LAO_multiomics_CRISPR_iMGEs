@@ -1,0 +1,15 @@
+rule filter_protospacers:
+    input:
+        "ALL/spacers/ALL_spacers-merged_x_ALL_MGMT.assembly.merged.tsv",
+        "ALL/repeats/ALL_repeats-merged_x_ALL_MGMT.assembly.merged.tsv"
+    output:
+        "ALL/protospacers/ALL_pspcc.tsv",
+        "ALL/protospacers/ALL_pspcc_qcov95_pident95.tsv", 
+        "ALL/protospacers/ALL_pspcc_qcov95_pident95.gff"
+    shell:
+        """
+        source {SRCDIR}/R_env.sh
+        Rscript {SRCDIR}/filterProtospacers.R {input[0]} {input[1]} {output[0]} {output[1]} 
+        Rscript {SRCDIR}/pspcc2gff.R {output[1]} {output[2]}
+        source {SRCDIR}/unload_R_env.sh
+        """

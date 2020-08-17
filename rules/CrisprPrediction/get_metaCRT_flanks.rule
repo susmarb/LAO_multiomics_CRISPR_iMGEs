@@ -1,0 +1,22 @@
+rule get_metaCRT_flanks:
+    input:
+        "ALL/metaCRT/metacrt_contigs-mgmt.out",
+        "%s/ALL-mgmt.assembly.merged.fa" % DB_FA_DIR 
+    output:
+        "ALL/metaCRT/metacrt_contigs-mgmt_flanks.fa",
+        "db/ALL-mgmt.assembly.merged.fa"
+    shell:
+        """
+        mkdir -p db
+        rsync -av {input[1]} {output[1]}
+        source {SRCDIR}/R_env.sh        
+        Rscript {SRCDIR}/parser_metaCRTout.R {input[0]} {TMPDIR}/flanks.bed {TMPDIR}/flanks.tsv
+
+        bedtools getfasta -fi {output[1]} -bed {TMPDIR}/flanks.bed -fo {TMPDIR}/flanks.fa
+        
+        Rscript {SRCDIR}/merge_bedfasta.R {TMPDIR}/flanks.bed {TMPDIR}/flanks.fa {TMPDIR}/metacrt_contigs-mgmt_flanks.tsv
+
+        awk '{{print \">\"$1\"\\n\"$2}}' {TMPDIR}/metacrt_contigs-mgmt_flanks.tsv > {output[0]}
+        touch {output}
+        source {SRCDIR}/unload_R_env.sh
+        """

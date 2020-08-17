@@ -1,0 +1,19 @@
+rule run_crass_mt_reads:
+    input:
+        "%s/{ts_sample}/Preprocessing/mt.r1.preprocessed.fq" % TS_DIR,
+        "%s/{ts_sample}/Preprocessing/mt.r2.preprocessed.fq" % TS_DIR,
+        "%s/{ts_sample}/Preprocessing/mt.se.preprocessed.fq" % TS_DIR,
+    output:
+        "ALL/{ts_sample}/crass_mt-reads/crass.crispr",
+        "ALL/{ts_sample}/crass_mt-reads/crass_mt-reads_{ts_sample}_spacers.fa",
+        "ALL/{ts_sample}/crass_mt-reads/crass_mt-reads_{ts_sample}_repeats.fa",
+        "ALL/{ts_sample}/crass_mt-reads/crass_mt-reads_{ts_sample}_flanks.fa"
+    shell:
+        """
+        {ESB_TOOLS_DIR}/crass_crispr/bin/crass -o {CRISPR_OUTDIR}/ALL/{wildcards.ts_sample}/crass_mt-reads -f 1 -n 2 {input[0]} {input[1]} {input[2]}
+        {ESB_TOOLS_DIR}/crass_crispr/bin/crisprtools extract {output[0]} -sspacers.fa -drepeats.fa -fflanks.fa -HALL/{wildcards.ts_sample}/crass_mt-reads/crass_mt-reads_{wildcards.ts_sample}_
+        
+        sed -i 's:ALL/{wildcards.ts_sample}/crass_mt-reads/:_:g' {output[1]}
+        sed -i 's:ALL/{wildcards.ts_sample}/crass_mt-reads/:_:g' {output[2]}
+        sed -i 's:ALL/{wildcards.ts_sample}/crass_mt-reads/:_:g' {output[3]}
+        """

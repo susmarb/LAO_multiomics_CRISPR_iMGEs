@@ -1,0 +1,138 @@
+---
+title: "Adding temporal information"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#####Loading libraries, etc.
+```{r}
+packs <- c("tidyverse", "stringr")
+for (i in 1:length(packs)){
+  library(packs[i], character.only = TRUE)
+}
+```
+#####Protospacer-containing contigs: this for workflow PlasmidPhageDereplication
+```{r}
+# make consistent the classification of all the mges
+in.redundant.pspcc.class <- "~/Documents/LAO_TS_analysis/MGE_analysis/ALL_MGE_class_iMGE_added.tsv"
+redundant.pspcc.class <- read_tsv(in.redundant.pspcc.class) %>% 
+  select(contig, pspcc,virsorter, virfinder, plasflow, cBar, class_iMGE) %>%
+  mutate(class_iMGE = case_when(virsorter == 0 & virfinder == 0 & cBar == 0 & plasflow == 0 ~ "unclassified",
+                                virsorter == 0 & virfinder == 0 & cBar == 1 & plasflow == 1 ~ "plasmid",
+                                virsorter == 0 & virfinder == 0 & cBar == 0 & plasflow == 1 ~ "plasmid",
+                                virsorter == 0 & virfinder == 0 & cBar == 1 & plasflow == 0 ~ "plasmid",
+                                virsorter == 1 & virfinder == 1 & cBar == 0 & plasflow == 0 ~ "phage",
+                                virsorter == 1 & virfinder == 0 & cBar == 0 & plasflow == 0 ~ "phage",
+                                virsorter == 0 & virfinder == 1 & cBar == 0 & plasflow == 0 ~ "phage",
+                                virsorter == 1 & virfinder == 0 & cBar == 0 & plasflow == 1 ~ "ambiguous",
+                                virsorter == 1 & virfinder == 0 & cBar == 1 & plasflow == 0 ~ "ambiguous",
+                                virsorter == 1 & virfinder == 1 & cBar == 0 & plasflow == 1 ~ "ambiguous",
+                                virsorter == 0 & virfinder == 1 & cBar == 1 & plasflow == 0 ~ "ambiguous",
+                                virsorter == 1 & virfinder == 1 & cBar == 1 & plasflow == 1 ~ "ambiguous",
+                                virsorter == 0 & virfinder == 1 & cBar == 1 & plasflow == 1 ~ "ambiguous",
+                                virsorter == 0 & virfinder == 1 & cBar == 0 & plasflow == 1 ~ "ambiguous",
+                                virsorter == 0 & virfinder == 1 & cBar == 1 & plasflow == 0 ~ "ambiguous",
+                                virsorter == 1 & virfinder == 1 & cBar == 1 & plasflow == 0 ~ "ambiguous",
+                                virsorter == 1 & virfinder == 0 & cBar == 1 & plasflow == 1 ~ "ambiguous")) 
+
+# get numbers for table 1 of the main text
+get_mge_type_numbers <- function(pspcc.class){
+mge_n <- dim(pspcc.class)[1]
+mge.PL_n <- dim(pspcc.class %>% filter(class_iMGE == "plasmid"))[1]
+mge.PH_n <- dim(pspcc.class %>% filter(class_iMGE == "phage"))[1]
+mge.AMB_n <- dim(pspcc.class %>% filter(class_iMGE == "ambiguous"))[1]
+mge.UNC_n <- dim(pspcc.class %>% filter(class_iMGE == "unclassified"))[1]
+
+mge_pspcc_n <- dim(pspcc.class %>% filter(pspcc == 1))[1]
+mge.PL_pspcc_n <- dim(pspcc.class %>% filter(pspcc == 1, class_iMGE == "plasmid"))[1]
+mge.PH_pspcc_n <- dim(pspcc.class %>% filter(pspcc == 1, class_iMGE == "phage"))[1]
+mge.AMB_pspcc_n <- dim(pspcc.class %>% filter(pspcc == 1, class_iMGE == "ambiguous"))[1]
+mge.UNC_pspcc_n <- dim(pspcc.class %>% filter(pspcc == 1, class_iMGE == "unclassified"))[1]
+
+tb <- as.tibble(c(mge.PL_n, mge.PH_n, mge.AMB_n, mge.UNC_n, mge_n)) %>% rename(n_total = value) %>% 
+      mutate(n_pspcc = c(mge.PL_pspcc_n, mge.PH_pspcc_n, mge.AMB_pspcc_n, mge.UNC_pspcc_n, mge_pspcc_n)) %>% 
+      mutate(type = c("Plasmid", "Phage", "Ambiguous", "Unclassified", "Total"))
+return(tb)
+}
+in.non.redundant.pspcc.class <- "~/Documents/LAO_TS_analysis/MGE_analysis/Host_CRISPR_MGE_analysis/ALL_candidate_mobile_elements-merged_type.tsv"
+non.redundant.pspcc.class <- read_tsv(in.non.redundant.pspcc.class) %>% select(contigR) %>% 
+  inner_join(., redundant.pspcc.class, by = c("contigR" = "contig"))
+
+redundant_mge_type_numbers <- get_mge_type_numbers(redundant.pspcc.class)
+non.redundat_mge_type_numbers <- get_mge_type_numbers(non.redundant.pspcc.class)
+
+# save 
+#write_tsv(redundant_mge_type_numbers, "~/Documents/LAO_TS_analysis/MGE_analysis/Host_CRISPR_MGE_analysis/ALL_candidate_mobile_elements_type_N.tsv")
+#write_tsv(non.redundat_mge_type_numbers, "~/Documents/LAO_TS_analysis/MGE_analysis/Host_CRISPR_MGE_analysis/ALL_candidate_mobile_elements-merged_type_N.tsv")
+
+# percentage of redundancy
+full_join(redundant_mge_type_numbers, non.redundat_mge_type_numbers, by = "type") %>% 
+  select(type, n_total.x, n_total.y) %>% 
+  mutate(percentage = n_total.y*100/n_total.x)
+```
+
+#####get table TS5; number of targeted elements per time point  
+```{r}
+in.host.dr.sp.pspcc <- "~/Documents/LAO_TS_analysis/MGE_analysis/Host_CRISPR_MGE_analysis/Host_DR_SP_PSPCC_class.tsv"
+in.nodes.info <- "~/Documents/LAO_TS_exploration/interactions/10ReGesNets_MGMT/ALL_nodes_attr_mgmt01_spread.tsv"
+
+# read tables
+host.dr.sp.pspcc <- read_tsv(in.host.dr.sp.pspcc) %>% select(-reDR, -pspcc) %>% unique() %>% mutate(class_iMGE = ifelse(is.na(class_iMGE), "undetected", class_iMGE))
+nodes.info <- read_tsv(in.nodes.info) 
+
+# filter populations 
+hosts.filt <- read_tsv("~/Documents/LAO_TS_analysis/MGE_analysis/Filtered_rbins_by_50con50com.txt", col_names = "rbin")
+
+host.dr.sp.pspcc %>% filter(rbin %in% hosts.filt$rbin) %>% 
+  left_join(., nodes.info, by = c("reSP" = "node")) %>% 
+  select(-type) %>% 
+  gather(date, presence, -rbin, -reSP, -class_iMGE) %>% 
+  filter(!is.na(presence)) %>% select(-reSP, -presence) %>% 
+  group_by(rbin, date, class_iMGE) %>% 
+  tally() %>% 
+  spread(date,n) %>% 
+  full_join(., hosts.filt) %>% 
+  arrange(rbin) -> tb_rege_targets_n_tp
+
+write_tsv(tb_rege_targets_n_tp, "~/Documents/LAO_TS_analysis/MGE_analysis/Host_CRISPR_MGE_analysis/Filtered_rbins_NtypeOfTargeted.tsv")
+```
+
+#####get networks
+This is mainly for supplementary tables  
+```{r}
+# rbin-phage
+host.dr.sp.pspcc <- read_tsv(in.host.dr.sp.pspcc)
+######## 
+# extra filter of reges (manually selected: those with no cas genes at all are discarded)
+tofilter <- c("D04_G2.5", "D04_L6", "D04_O2.19", 
+              "D05_G3.4", "D05_L3.17", "D08_O6", "D08_P1.44", 
+              "D11_O1.27.3", "D11_O1.7", "D12_L1.3", "D12_L1.3", "D13_L7", 
+              "D16_L3.1.1", "D16_O2.2.1.1.14", "D19_G1.34.1.1",
+              "D22_L1.5.4", "D28_L2.9", "D28_O5", "D29_L5", "D30_G5", "D30_P23", "D31_L12", "D31_L19",
+              "D32_L11.2", "D32_O1.57", "D34_O11.2.1", "D35_G2.16", "D35_G2.27", 
+              "D33_L1.8.2", "D36_L1.15", "D41_O4", "D36_L1.41", "D36_L12", "D36_O18", "D37_G11",
+              "D37_G5", "D37_L8", "D38_G2.3", "D38_O15", "D39_O1.57", "D42_G1.1.2.3", "D42_G14", "D43_G6",
+              "D44_O1.1.2.2.1.2.7", "D46_L2.48", "D47_G1.71.2", "D51_L1.24", "D51_G9", "D49_O1", "D49_G15",
+              "D47_O5")
+#######
+
+host.dr.sp.pspcc %>% 
+  filter(rbin %in% hosts.filt$rbin) %>%
+  filter(rbin %in% tofilter) %>% 
+  filter(class_iMGE == "phage") %>% 
+  select(rbin, pspcc) %>% unique() -> rbin_ph_net
+
+# save
+write_tsv(rbin_ph_net, "~/Documents/LAO_TS_analysis/MGE_analysis/Host_CRISPR_MGE_analysis/rbinFiltered_ph_net.tsv")
+
+host.dr.sp.pspcc %>% 
+  filter(rbin %in% hosts.filt$rbin) %>%
+  filter(rbin %in% tofilter) %>% 
+  filter(class_iMGE == "phage") %>% 
+  select(reSP, pspcc) %>% unique() -> sp_ph_net
+# save
+write_tsv(sp_ph_net, "~/Documents/LAO_TS_analysis/MGE_analysis/Host_CRISPR_MGE_analysis/spFilt_ph_net.tsv")
+
+```

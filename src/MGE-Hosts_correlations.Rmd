@@ -1,0 +1,351 @@
+---
+title: "Network exploration"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Installing/loading libraries
+```{r hello}
+packs <- c("sna", "tsna", "ndtv", "tidyverse", "Hmisc", "vegan", "psych")
+for (i in 1:length(packs)){library(packs[i], character.only = TRUE)}
+```
+### Functions
+```{r}
+flat_cor_mat <- function(cor_r, cor_p){
+  #This function provides a simple formatting of a correlation matrix
+  #into a table with 4 columns containing :
+    # Column 1 : row names (variable 1 for the correlation test)
+    # Column 2 : column names (variable 2 for the correlation test)
+    # Column 3 : the correlation coefficients
+    # Column 4 : the p-values of the correlations
+  library(tidyr)
+  library(tibble)
+  cor_r <- rownames_to_column(as.data.frame(cor_r), var = "row")
+  cor_r <- gather(cor_r, column, cor, -1)
+  cor_p <- rownames_to_column(as.data.frame(cor_p), var = "row")
+  cor_p <- gather(cor_p, column, p, -1)
+  cor_p_matrix <- left_join(cor_r, cor_p, by = c("row", "column"))
+  cor_p_matrix
+}
+```
+
+### Data
+ + Input data files  
+```{r message=FALSE, warning=FALSE}
+indir <- "/Users/susana.martinez/Documents/LAO_TS_analysis/MGE_analysis/Host_CRISPR_MGE_analysis/Networks"
+
+# networks
+net_ph.in <- paste(indir, "Final_rbin_phagenet.tsv", sep = "/")
+net_pl.in <- paste(indir, "Final_rbin_plasmidnet.tsv", sep = "/")
+
+# node attribute files, with the abundance/expression of each omic
+# MG
+mg.in <- paste(indir, "ALL_nodes_mg_attr.txt", sep = "/")
+# MT
+mt.in <- paste(indir, "ALL_nodes_mt_attr.txt", sep = "/")
+
+## physico-chemical parameters
+pcfile <- "~/Documents/LAO_TS_analysis/LAO_TS_exploration/PhysicoChemical/pc_params.processed.tsv"
+pc_tb <- read_tsv(pcfile)
+
+```
+ + Loading data  
+```{r}
+# networks
+net_ph <- read_tsv(net_ph.in)
+net_pl <- read_tsv(net_pl.in)
+
+#### Check that there are not ambiguous MGEs
+intersect(unique(net_ph$pspcc),unique(net_pl$pspcc))
+
+# mg and mt information
+mg <- read_tsv(mg.in)
+
+```
+
+### Correlations
+ + Get tables to calculate corretations: for MG and MT, and scaled to z-scores
+```{r message=FALSE, warning=FALSE}
+# MG
+# get data frames of each element and its abundance per time point, then scale to calculate correlations
+mg.mge_z <- mg %>% 
+          filter(type != "host", type != "spacer") %>% 
+          gather(date, mg, -node, -type) %>% 
+          select(-type) %>% 
+          spread(node, mg) %>% 
+          select(-date) %>% 
+          replace(is.na(.), 0) %>% 
+          scale(., center = FALSE, scale = TRUE)
+
+mg.host_z <- mg %>% 
+          filter(type == "host") %>% 
+          gather(date, mg, -node, -type) %>% 
+          select(-type) %>% 
+          spread(node, mg) %>% 
+          select(-date) %>% 
+          replace(is.na(.), 0) %>% 
+          scale(., center = FALSE, scale = TRUE) 
+
+# merge all together in one table
+dim(mg.host_z);dim(mg.mge_z)
+all_to_corr_mg_z <- cbind(mg.host_z, mg.mge_z)
+rm(mg.host_z, mg.mge_z)
+
+## MT: repeat same steps as for MG
+mt.mge_z <- mt %>% 
+          filter(type != "host", type != "spacer") %>% 
+          gather(date, mt, -node, -type) %>% 
+          select(-type) %>% 
+          spread(node, mt) %>% 
+          select(-date) %>% 
+          replace(is.na(.), 0) %>% 
+          scale(., center = FALSE, scale = TRUE) 
+mt.host_z <- mt %>% 
+          filter(type == "host") %>% 
+          gather(date, mt, -node, -type) %>% 
+          select(-type) %>% 
+          spread(node, mt) %>% 
+          select(-date) %>% 
+          replace(is.na(.), 0) %>% 
+          scale(., center = FALSE, scale = TRUE) 
+# merge all together in one table
+dim(mt.mge_z); dim(mt.host_z)
+all_to_corr_mt_z <- cbind(mt.host_z, mt.mge_z)
+rm(mt.host_z, mt.mge_z)
+```
+ + Pearson correlations PHAGES-host
+```{r}
+# omics tables for phages, scaled
+as.tibble(all_to_corr_mg_z) %>% 
+  rownames_to_column("date") %>% 
+  gather(nodes, mg_z, -date) %>% 
+  filter(nodes %in% unique(c(net_ph$rbin, net_ph$pspcc))) %>% 
+  spread(nodes, mg_z) %>% 
+  select(-date) %>% 
+  as.matrix() -> ph_mat_to_corr_mg
+
+as.tibble(all_to_corr_mt_z) %>% 
+  rownames_to_column("date") %>% 
+  gather(nodes, mt_z, -date) %>% 
+  filter(nodes %in% unique(c(net_ph$rbin, net_ph$pspcc))) %>% 
+  spread(nodes, mt_z) %>% 
+  select(-date) %>% 
+  as.matrix() -> ph_mat_to_corr_mt
+
+# correlation matrices
+dim(ph_mat_to_corr_mt)
+cor_mg_ph <- corr.test(ph_mat_to_corr_mg, adjust = "BH")
+# save the psych object
+dput(cor_mg_ph, paste(indir, "MG_phage_host_correlation_object_from_psych.txt", sep = "/"))
+
+# make them flat, but not filtered by the network interactions, it might be interesting to see what other plasmid-host correlations there are
+as.data.frame(cor_mg_ph$r) %>% 
+  rownames_to_column("row") %>% 
+  as.tibble() %>% 
+  gather(column, cor_mg, -row) %>% 
+  # filter(row %in% hosts$node) %>% 
+  # filter(!column %in% hosts$node) %>% 
+  unite("pair", c("row", "column"), sep = "-") -> tmp_cor_mg_flat_ph
+
+as.data.frame(cor_mg_ph$p) %>% 
+  rownames_to_column("row") %>% 
+  as.tibble() %>% 
+  gather(column, pval_mg, -row) %>% 
+  # filter(row %in% hosts$node) %>% 
+  # filter(!column %in% hosts$node) %>% 
+  unite("pair", c("row", "column"), sep = "-") %>% 
+  left_join(., tmp_cor_mg_flat_ph, by = "pair") -> coR_p_mg_flat_ph
+rm(tmp_cor_mg_flat_ph)
+
+#MT 
+cor_mt_ph <- corr.test(ph_mat_to_corr_mt, adjust = "BH")
+dput(cor_mt_ph, paste(indir, "MT_phage_host_correlation_object_from_psych.txt", sep = "/"))
+
+# make them flat, but not filtered by the network interactions, it might be interesting to see what other plasmid-host correlations there are
+as.data.frame(cor_mt_ph$r) %>% 
+  rownames_to_column("row") %>% 
+  as.tibble() %>% 
+  gather(column, cor_mt, -row) %>% 
+  # filter(row %in% hosts$node) %>% 
+  # filter(!column %in% hosts$node) %>% 
+  unite("pair", c("row", "column"), sep = "-") -> tmp_cor_mt_flat_ph
+
+as.data.frame(cor_mt_ph$p) %>% 
+  rownames_to_column("row") %>% 
+  as.tibble() %>% 
+  gather(column, pval_mt, -row) %>% 
+  # filter(row %in% hosts$node) %>% 
+  # filter(!column %in% hosts$node) %>% 
+  unite("pair", c("row", "column"), sep = "-") %>% 
+  left_join(., tmp_cor_mt_flat_ph, by = "pair") -> coR_p_mt_flat_ph
+rm(tmp_cor_mt_flat_ph)
+
+# ------------- #
+
+# add correlation and pvalues to network
+net_ph %>% 
+  unite("pair", c("rbin", "pspcc"), sep = "-", remove = FALSE) %>% 
+  left_join(., coR_p_mg_flat_ph, by = "pair") %>% 
+  left_join(., coR_p_mt_flat_ph) -> net_ph_cor_p
+write_tsv(net_ph_cor_p, paste(indir, "Final_rbin_phage_net_cor_p.tsv", sep = "/"))
+
+```
+ + Calculate Pearson correlation: PLASMIDS
+```{r}
+# omics tables for phages, scaled
+as.tibble(all_to_corr_mg_z) %>% 
+  rownames_to_column("date") %>% 
+  gather(nodes, mg_z, -date) %>% 
+  filter(nodes %in% unique(c(net_pl$rbin, net_pl$pspcc))) %>% 
+  spread(nodes, mg_z) %>% 
+  select(-date) %>% 
+  as.matrix() -> pl_mat_to_corr_mg
+
+as.tibble(all_to_corr_mt_z) %>% 
+  rownames_to_column("date") %>% 
+  gather(nodes, mt_z, -date) %>% 
+  filter(nodes %in% unique(c(net_pl$rbin, net_pl$pspcc))) %>% 
+  spread(nodes, mt_z) %>% 
+  select(-date) %>% 
+  as.matrix() -> pl_mat_to_corr_mt
+
+# correlation matrices
+#dim(pl_mat_to_corr_mt)
+cor_mg_pl <- corr.test(pl_mat_to_corr_mg, adjust = "BH")
+# save the psych object
+dput(cor_mg_pl, paste(indir, "MG_plasmid_host_correlation_object_from_psych.txt", sep = "/"))
+
+# make them flat, but not filtered by the network interactions, it might be interesting to see what other plasmid-host correlations there are
+as.data.frame(cor_mg_pl$r) %>% 
+  rownames_to_column("row") %>% 
+  as.tibble() %>% 
+  gather(column, cor_mg, -row) %>% 
+  unite("pair", c("row", "column"), sep = "-") -> tmp_cor_mg_flat_pl
+
+as.data.frame(cor_mg_pl$p) %>% 
+  rownames_to_column("row") %>% 
+  as.tibble() %>% 
+  gather(column, pval_mg, -row) %>% 
+  unite("pair", c("row", "column"), sep = "-") %>% 
+  left_join(., tmp_cor_mg_flat_pl, by = "pair") -> coR_p_mg_flat_pl
+rm(tmp_cor_mg_flat_pl)
+
+#MT 
+cor_mt_pl <- corr.test(pl_mat_to_corr_mt, adjust = "BH")
+dput(cor_mt_pl, paste(indir, "MT_plasmid_host_correlation_object_from_psych.txt", sep = "/"))
+
+# make them flat, but not filtered by the network interactions, it might be interesting to see what other plasmid-host correlations there are
+as.data.frame(cor_mt_pl$r) %>% 
+  rownames_to_column("row") %>% 
+  as.tibble() %>% 
+  gather(column, cor_mt, -row) %>% 
+  unite("pair", c("row", "column"), sep = "-") -> tmp_cor_mt_flat_pl
+
+as.data.frame(cor_mt_pl$p) %>% 
+  rownames_to_column("row") %>% 
+  as.tibble() %>% 
+  gather(column, pval_mt, -row) %>% 
+  unite("pair", c("row", "column"), sep = "-") %>% 
+  left_join(., tmp_cor_mt_flat_pl, by = "pair") -> coR_p_mt_flat_pl
+rm(tmp_cor_mt_flat_pl)
+
+# ------------- #
+
+# add corretaion and pvalues to network
+net_pl %>% 
+  unite("pair", c("rbin", "pspcc"), sep = "-", remove = FALSE) %>% 
+  left_join(., coR_p_mg_flat_ph, by = "pair") %>% 
+  left_join(., coR_p_mt_flat_ph) -> net_pl_cor_p
+write_tsv(net_pl_cor_p, paste(indir, "Final_rbin_plasmid_net_cor_p.tsv", sep = "/"))
+
+```
+### Other stuff
+```{r}
+# net_ph %>% 
+#   unite("interaction", c("rbin", "pspcc"), sep = "-") -> net_ph_int
+# 
+# my_cor_matrix %>% 
+#   unite("pair", c("row", "column"), sep = "-", remove = FALSE) %>%   
+#   filter(pair %in% net_ph_int$interaction) %>% 
+#   #filter(cor < -0.5 | cor > 0.5) %>% 
+#   full_join(., net_ph_int, by = c("pair" = "interaction")) %>% 
+#   select(-pair) %>% 
+#   rename(Phage = column, Host = row, Correlation = cor, p_value = p) -> net_ph_int_cor_p
+# write_tsv(net_ph_int_cor_p, paste(indir, "Final_rbin_phagenet_coR_pval_005.tsv", sep = "/"))
+```
+
+Let's check phages and plasmids of Microthrix
+```{r}
+# phages
+# #list of phages interacting with microthrix
+# net_ph %>% filter(rbin == "D51_G1.1.2") %>% select(pspcc) -> mparv_ph
+# my_cor_matrix %>% 
+#   filter(row == "D51_G1.1.2") %>% 
+#   filter(column != "D51_G1.1.2") %>% 
+#   filter(column %in% mparv_ph$pspcc) %>% 
+#   arrange(cor) -> mparv_corr_ph
+## "D36_N_contig_120762", "D36_N_contig_368349", 
+
+```
+```{r}
+# phs_cor <- c("D49_N_contig_29016", "D36_N_contig_120762", "D36_N_contig_368349", "D51_G1.1.2")
+# # abundace plots
+# mg %>% 
+#   filter(node %in% c(mparv_corr_ph$row, mparv_corr_ph$column)) %>% 
+#   select(-type) %>% 
+#   gather(date, mg, -node) %>% 
+#   mutate(date = as.Date(date)) %>% 
+#   filter(!grepl("2010-10-04", date)) %>% 
+#   filter(!grepl("2011-01-25", date)) %>%
+#   filter(node %in% phs_cor) %>% 
+#   ggplot(aes(x=date, y=mg, color=as.factor(node))) +
+#   geom_line()
+```
+
+ # CCA analysis
+```{r}
+## ------ cca = canonical correlation analysis
+## scale PC parameters
+# pc_tb %>% 
+#   group_by(Type) %>% 
+#   mutate(value = scale(value, center = FALSE)) %>% 
+#   ungroup() %>% 
+#   select(-Type) %>% 
+#   spread(variable, value) %>% 
+#   column_to_rownames("Date") %>% 
+#   replace(is.na(.), 0) %>% 
+#   as.data.frame() -> pc_mtx.scaled
+# 
+# # phages and reges together, scaled independently. merged them
+# mg.host %>% scale(., center = FALSE) -> mg.host.scaled
+# mg.ph %>% scale(., center = FALSE) -> mg.ph.scaled
+# cbind(mg.host, mg.ph) -> mg.host.ph.scaled
+
+
+### first do a normal PCA to get what elements are influencing the most (PCs), just to see what explains most of the variance
+
+```
+```{r}
+# cca analysis, and plot
+# host, pc
+# cca_host_pc <- cca(mg.host.scaled, pc_mtx.scaled)
+# plot(cca_host_pc)
+# 
+# # phages, pc
+# cca_phage_pc <- cca(mg.ph.scaled, pc_mtx.scaled)
+# plot(cca_phage_pc)
+# 
+# # host-phages, pc
+# cca_host_phage_pc <- cca(mg.host.ph.scaled, pc_mtx.scaled)
+# plot(cca_host_phage_pc)
+# ## 
+# cca_phage_temperature <- cca(mg.ph.scaled ~ Temp_Air + Temp_manual, data=pc_mtx.scaled)
+# cca_phage_temperature
+# plot(cca_phage_temperature)
+
+```

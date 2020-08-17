@@ -1,0 +1,17 @@
+rule collect_plasmids:
+    input:
+        "%s" % CBAR_DIR,
+        "%s" % PLASF_DIR
+    output:
+        idsplas = "ALL_PlasFlow_id_contigs.txt",
+        idsbar = "ALL_cBar_id_contigs.txt"
+    shell:
+        """
+        ## cBar plasmids
+        cat {CBAR_DIR}/*/cBar_mgmt_plasmids.tsv | grep 'Plasmid' | cut -f 1 > {output.idsbar}
+
+        ## plasflow plasmids
+        cat {PLASF_DIR}/*/PlasFlow_mgmt_plasmids.tsv | cut -f 3,6 | grep 'plasmid' | cut -f 1 > {output.idsplas} 
+
+        touch {output} 
+        """

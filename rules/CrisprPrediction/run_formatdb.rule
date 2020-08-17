@@ -1,0 +1,13 @@
+rule format_blastdb:
+    input:
+        "db/ALL-mgmt.assembly.merged.fa",
+        "ALL/spacers/ALL_spacers-merged.fa.tbl2seq",
+        "ALL/repeats/ALL_repeats-merged.fa.tbl2seq",
+        "ALL/flanks/ALL_flanks-merged.fa.tbl2seq"
+    output:
+        "db/formatdb.done"
+    shell:
+        """
+        formatdb -i {input[0]} -p F -n {input[0]}
+        touch {output}
+        """

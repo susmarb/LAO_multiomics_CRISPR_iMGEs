@@ -1,0 +1,21 @@
+rule identification_of_hosts:
+    input:
+        blastflank = "ALL_flanks-merged_x_ALL_representative_genomes.tsv",
+        blastdr = "ALL_repeats-merged_x_ALL_representative_genomes.tsv",
+        flank = "%s/flanks/ALL_flanks-merged.fa.tbl2seq" % CRISPR_ELEMENTS_DIR,
+        dr = "%s/repeats/ALL_repeats-merged.fa.tbl2seq" % CRISPR_ELEMENTS_DIR,
+        previous = "link_sp2pspcc.done"
+    output:
+        host = "Hosts_FLDR4SP.tsv",
+        done = "identification_host.done"
+    shell:
+        """
+        source {SRCDIR}/R_env.sh
+
+        if [ {DREP_DONE} == "yes" ] ; then
+            Rscript {SRCDIR}/identification_host.R {input.blastflank} {input.blastdr} {input.flank} {input.dr} {OUTDIR} {BIN_DICT}
+        else
+            Rscript {SRCDIR}/identification_host.R {input.blastflank} {input.blastdr} {input.flank} {input.dr} {OUTDIR} NA
+        fi
+        touch {output.done}
+        """

@@ -1,0 +1,38 @@
+rule run_cbar:
+    input:
+        "%s/Assemblies/{ts_sample}-mgmt.assembly.merged.fa" % TS_DIR,
+        "PlasFlow/{ts_sample}/{ts_sample}_mgmt.done"
+    output:
+        "cBar/{ts_sample}/cBar_mgmt_plasmids.tsv",
+        "cBar/{ts_sample}/{ts_sample}_mgmt.done"
+    shell:
+        """
+        source {ESB_TOOLS_DIR}/PlasFlow/plasflow_env/bin/activate {ESB_TOOLS_DIR}/PlasFlow/plasflow_env 
+        source {SRCDIR}/parallel_function.sh
+
+        mkdir -p cBar/{wildcards.ts_sample} tmp_plasc
+        mkdir -p {ESB_TOOLS_DIR}/cBar/cBar.1.2/temp
+
+        #filter fasta file by seqs => 1000
+        perl {ESB_TOOLS_DIR}/PlasFlow/filter_sequences_by_length.pl \
+        -input {input[0]} \
+        -output tmp_plasc/{wildcards.ts_sample}-mgmt.assembly.merged_filtered.fasta \
+        -thresh 1000
+
+        #split input fasta file
+        NSEQS=$(( $( grep -c \> tmp_plasc/{wildcards.ts_sample}-mgmt.assembly.merged_filtered.fasta)/ ({THREADS}+1)))
+
+        awk 'BEGIN {{n_seq=0;}} /^>/ {{if(n_seq%"'"$NSEQS"'"==0){{file=sprintf("tmp_plasc/{wildcards.ts_sample}-mgmt.assembly.merged_%d_c.fa",n_seq);}} print >> file; n_seq++; next;}} {{ print >> file; }}' < tmp_plasc/{wildcards.ts_sample}-mgmt.assembly.merged_filtered.fasta
+
+        #run cBar in parallel
+        for f in `ls tmp_plasc/{wildcards.ts_sample}-mgmt.assembly.merged_*_c.fa` ; do
+            echo $f
+            perl {ESB_TOOLS_DIR}/cBar/cBar.1.2/cBar.pl ${{f}} {output[0]} &
+            pwait {THREADS}
+        done
+        wait
+        
+        rm -rf tmp*
+        touch {output}
+        """
+

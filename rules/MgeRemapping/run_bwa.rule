@@ -1,0 +1,38 @@
+rule read_mapping_run_bwa:
+    input:
+        a = "%s/{ts_sample}/Preprocessing/{type}.r1.preprocessed.fq" % TS_DIR,
+        b = "%s/{ts_sample}/Preprocessing/{type}.r2.preprocessed.fq" % TS_DIR,
+        se = "%s/{ts_sample}/Preprocessing/{type}.se.preprocessed.fq" % TS_DIR,
+        fa = "Index/ALL_MGEs-merged.fa",
+        amb = "Index/ALL_MGEs-merged.fa.amb",
+        bwt = "Index/ALL_MGEs-merged.fa.bwt",
+        pac = "Index/ALL_MGEs-merged.fa.pac",
+        sa = "Index/ALL_MGEs-merged.fa.ann",
+        ann = "Index/ALL_MGEs-merged.fa.sa",
+        done = "index_bwa.done"
+    output:
+        bam = "Mappings/{ts_sample}.{type}.reads.sorted.bam",
+        bai = "Mappings/{ts_sample}.{type}.reads.sorted.bam.bai"
+    shell:
+        """
+        mkdir -p Mappings
+         
+        SAMHEADER="@RG\\tID:{wildcards.ts_sample}\\tSM:{wildcards.type}"
+        PREFIX=Mappings/{wildcards.ts_sample}.{wildcards.type}.reads
+        
+        # merge paired and se
+        samtools merge -@ {THREADS} -f ${{PREFIX}}.merged.bam \
+        <(bwa mem -v 1 -t {THREADS} -M -R \"${{SAMHEADER}}\" {input.fa} {input.a} {input.b} | \
+        samtools view -@ {THREADS} -bS -) \
+        <(bwa mem -v 1 -t {THREADS} -M -R \"${{SAMHEADER}}\" {input.fa} {input.se} | \
+        samtools view -@ {THREADS} -bS -)
+        
+        # sort
+        samtools sort -@ {THREADS} -m {MEMCORE}G ${{PREFIX}}.merged.bam ${{PREFIX}}.sorted
+        rm ${{PREFIX}}.merged.bam
+         
+        # index
+        samtools index ${{PREFIX}}.sorted.bam
+        """
+
+

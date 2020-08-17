@@ -1,0 +1,31 @@
+{
+    "threads": 12,
+    "memory_total_gb": 384,
+    "memory_per_core_gb": 32,
+    "tmp_dir": "/tmp",
+    "sample": "test",
+    "outputdir": "/output",
+    "db_path": "/mnt/nfs/projects/ecosystem_biology/local_tools/IMP/dependencies/prokka/db",
+    "prokka": {
+        "databases": [
+            "cm/Bacteria.i1i",
+            "genus/Staphylococcus.phr",
+            "hmm/CLUSTERS.hmm.h3f",
+            "kingdom/Archaea/sprot.phr"
+        ]
+    },
+    "kegg": {
+        "db_ec2pthy": "http://rest.kegg.jp/link/ec/pathway",
+        "db_hierarchy": "http://rest.kegg.jp/list/pathway"
+    },
+     "binning": {
+        "pk": 10,
+        "nn": 4
+    },
+   "dRep": {
+        "completeness": 0.6,
+        "strain_htr": 101,
+        "P_ani": 0.6,
+        "S_ani": 0.965
+    }
+}

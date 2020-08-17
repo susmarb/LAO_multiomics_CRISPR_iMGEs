@@ -1,0 +1,17 @@
+rule blast_repeats:
+    input:
+        fa = "ALL/repeats/ALL_repeats-merged.fa",
+        so = "db/ALL-mgmt.assembly.merged.fa",
+        log = "db/formatdb.done"
+    output:
+        blastout = "ALL/repeats/ALL_repeats-merged_x_ALL_MGMT.assembly.merged.tsv",
+        done = "ALL/repeats/blast_repeats.done"
+    shell:
+        """
+        FILESIZE=$(stat -c%s "{input.fa}")
+        BSIZE=$(echo $(($FILESIZE/{THREADS}/2)))
+        
+        cat {input.fa} | parallel --gnu --plain -j {THREADS} --block ${{BSIZE}} --recstart '>' --pipe blastn -query - -db {input.so} -task 'blastn-short' -outfmt "6\ qseqid\ sseqid\ pident\ length\ mismatch\ gapopen\ qstart\ qend\ qlen\ qcovs\ sstart\ send\ slen\ evalue\ bitscore" >> {output.blastout} 
+        sed -i '1i qseqid\tsseqid\tpident\tlength\tmismatch\tgapopen\tqstart\tqend\tqlen\tqcovs\tsstart\tsend\tslen\tevalue\tbitscore' {output.blastout} 
+        touch {output.done}
+        """

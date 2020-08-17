@@ -1,0 +1,19 @@
+rule link_hosts_to_mge:
+    input:
+        host_sp = "Hosts_SP.tsv",
+        spPsp = "ALL_Spacers_to_PSpCC.tsv",
+        previous = "link_hosts_to_spacers.done"
+    output:
+        host_mge = "Hosts_PSpCC.tsv",
+        done = "link_host2pspcc.done"
+    shell:
+        """
+        # if there are no spacers linked to hosts, generate empty output file
+        if [ -s {input.host_sp} ] ; then
+            source {SRCDIR}/R_env.sh
+            Rscript {SRCDIR}/link_host_mge.R {input.host_sp} {input.spPsp} {output.host_mge}        
+        else
+            touch {output.host_mge}
+        fi
+        touch {output.done}
+        """

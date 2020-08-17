@@ -1,0 +1,34 @@
+rule run_virfinder_mt:
+    input:
+        "%s/{ts_sample}/Assembly/mt.megahit_preprocessed.1.fa" % TS_DIR,
+        "VirFinder/{ts_sample}/{ts_sample}_mgmt.done"
+    output:
+        "VirFinder/{ts_sample}/VirFinder_phages_mt_all.tsv",
+        "VirFinder/{ts_sample}/VirFinder_phages_mt_pval005.tsv", 
+        "VirFinder/{ts_sample}/VirFinder_phages_mt_pval001.tsv",
+        "VirFinder/{ts_sample}/{ts_sample}_mt.done"
+    shell:
+        """
+        source {ESB_TOOLS_DIR}/PlasFlow/plasflow_env/bin/activate {ESB_TOOLS_DIR}/PlasFlow/plasflow_env
+        source {SRCDIR}/parallel_function.sh
+        source {SRCDIR}/R_env.sh
+
+        mkdir -p tmp_vf
+
+        # filter fasta file by seqs>1000
+        perl {ESB_TOOLS_DIR}/PlasFlow/filter_sequences_by_length.pl -input {input[0]} -output tmp_vf/{wildcards.ts_sample}-mgmt.assembly.merged_filtered.fasta -thresh 1000
+
+        # split input fasta file
+        NSEQS=$(( $( grep -c \> tmp_vf/{wildcards.ts_sample}-mgmt.assembly.merged_filtered.fasta)/ ({THREADS}+1)))
+        awk 'BEGIN {{n_seq=0;}} /^>/ {{if(n_seq%"'"$NSEQS"'"==0){{file=sprintf("tmp_vf/{wildcards.ts_sample}-mgmt.assembly.merged__%d.fa",n_seq);}} print >> file; n_seq++; next;}} {{ print >> file; }}' < tmp_vf/{wildcards.ts_sample}-mgmt.assembly.merged_filtered.fasta
+
+        for f in `ls tmp_vf/{wildcards.ts_sample}-mgmt.assembly.merged__*.fa`
+        do
+            echo $f
+#            touch {output[0]} {output[1]} {output[2]}
+            Rscript {SRCDIR}/VirFinder_phage_prediction.R ${{f}} {output[0]} {output[1]} {output[2]} &
+            pwait {THREADS}
+        done
+        wait
+        touch {output}
+        """

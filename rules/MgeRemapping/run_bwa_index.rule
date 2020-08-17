@@ -1,0 +1,20 @@
+rule index_fasta:
+    input:
+        "%s/ALL_MGEs-merged.fa" % IGE_DIR,
+    output:
+        "Index/ALL_MGEs-merged.fa", 
+        "Index/ALL_MGEs-merged.fa.amb",
+        "Index/ALL_MGEs-merged.fa.bwt",
+        "Index/ALL_MGEs-merged.fa.pac",
+        "Index/ALL_MGEs-merged.fa.ann",
+        "Index/ALL_MGEs-merged.fa.sa",
+        "index_bwa.done"
+    shell:
+        """
+        mkdir -p Index
+        ln -s {input[0]} {output[0]}
+        bwa index {output[0]}
+        touch {output[6]}
+        """
+
+

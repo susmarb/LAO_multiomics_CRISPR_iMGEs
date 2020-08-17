@@ -1,0 +1,225 @@
+---
+title: "Network exploration"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+###installing/loading libraries
+```{r message=FALSE, warning=FALSE}
+# install.packages("BiocManager") 
+# BiocManager::install("WGCNA") 
+
+packs <- c("sna", "tsna", "ndtv", "tidyverse")
+for (i in 1:length(packs)){
+  if(packs[i] %in% rownames(installed.packages()) == FALSE){
+    install.packages(packs[i], repos="http://cran.univ-paris1.fr/")
+  }
+  library(packs[i], character.only = TRUE)
+}
+```
+###data
+```{r message=FALSE, warning=FALSE}
+indir <- "/Users/susana.martinez/Documents/LAO_TS_analysis/MGE_analysis/Host_CRISPR_MGE_analysis/Networks"
+
+# phage networks
+nodes_ph.in <- paste(indir, "Final_nodes_spreadMGMT_phage.tsv", sep = "/")
+net_ph.in <- paste(indir, "Final_rbin_phagenet.tsv", sep = "/")
+
+# plasmid networks
+nodes_pl.in <- paste(indir, "Final_nodes_spreadMGMT_plasmid.tsv", sep = "/")
+net_pl.in <- paste(indir, "Final_rbin_plasmidnet.tsv", sep = "/")
+```
+
+###PH-host network: interactions
+ + Get edge attributes, i.e. present/absence og edges per time point  
+```{r message=FALSE, warning=FALSE}
+# get unite(A-B)/dates with 0 or 1, and then get average, median, sd
+# which will be then the wight of the edge, variance, etc.
+
+nodes_ph <- read_tsv(nodes_ph.in) %>% gather(date, omic, -node, -type) %>% filter(!is.na(omic))
+net_ph <- read_tsv(net_ph.in)
+
+net_ph %>% 
+    inner_join(., nodes_ph, by = c("rbin" = "node")) %>% filter(!is.na(omic)) %>% 
+    select(-omic, -type) %>%
+    inner_join(., nodes_ph, by = c("pspcc" = "node", "date")) %>% filter(!is.na(omic)) %>% 
+    select(-omic, -type) %>% 
+  unite("edge", c("rbin", "pspcc"), sep = "-") %>% 
+  mutate(interaction = 1) %>% 
+  spread(date, interaction, fill = 0) -> edge_tab
+#write_tsv(edge_tab, paste(indir, "ALL_phage_networks", "Edge_attributes.tsv", sep = "/"))
+
+edge_tab %>% 
+  gather(date, presence, -edge) %>% 
+  group_by(edge) %>% 
+  mutate(n_occurrence = sum(presence)) %>% 
+  mutate(weight_edge = mean(presence)) -> edge_tab_weigth_occ
+write_tsv(edge_tab_weigth_occ, paste(indir, "ALL_phage_networks", "Edge_attributes_witgh_dates.tsv", sep = "/"))
+
+
+```
+ + Estimate a weight per edge based on the averaged presence
+```{r message=FALSE, warning=FALSE}
+edge_tab_weigth_occ %>% 
+    spread(date, presence) %>% 
+  select(weight_edge) %>% 
+  ggplot(aes(x=weight_edge)) + 
+  geom_histogram() 
+
+edge_tab_weigth_occ %>%
+    spread(date, presence) %>% 
+  select(n_occurrence) %>% 
+  ggplot(aes(x=n_occurrence)) + 
+  geom_histogram() +
+  scale_x_discrete(limits=0:51)
+```
+ + Difference in the number of new edges per time point: with respect to the previous time point  
+```{r message=FALSE, warning=FALSE}
+TPs <- edge_tab_weigth_occ %>% ungroup() %>% select(date) %>% unique() %>% mutate(date = as.Date(date))
+
+edge_tab_weigth_occ %>% 
+  ungroup() %>% 
+  mutate(date = as.Date(date)) %>% 
+  group_by(date) %>% 
+  mutate(n_ints = sum(presence)) %>% 
+  ungroup() %>% 
+  select(date, n_ints) %>% unique() %>% 
+  mutate(t_minus_1 = lag(n_ints)-n_ints) %>%
+  gather(type, value, -date) %>% 
+  group_by(type) %>% 
+  mutate(average=mean(value, na.rm=TRUE), median = median(value, na.rm=TRUE), variance = sd(value, na.rm=TRUE)) -> n_ints_with_lag
+
+n_ints_with_lag %>% 
+  ggplot(aes(x=date, y=value, fill=type)) +
+  geom_line() + 
+  scale_x_date(breaks=TPs$date) +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90))
+  
+n_ints_with_lag %>% ungroup() %>% select(2,4,5,6) %>% unique()
+```
+ + new edges per time point, i.e. edges that did not appear until TPn --> new interactions over time  
+```{r message=FALSE, warning=FALSE}
+edge_tab_weigth_occ %>% 
+    ungroup() %>% 
+    select(1,2,3) %>% 
+    group_by(date) %>% 
+    mutate(int_per_tp = sum(presence)) %>% ungroup() %>% 
+    group_by(edge) %>% 
+    mutate(cummulative_presence_ints = cumsum(presence)) %>% 
+    mutate(new_ints = case_when(cummulative_presence_ints == 0 ~ 0,
+                                cummulative_presence_ints == 1 & lag(cummulative_presence_ints) == 0 ~ 1,
+                                cummulative_presence_ints == lag(cummulative_presence_ints) ~ 0,
+                                cummulative_presence_ints > 1 ~ 0)) %>% ungroup() %>% 
+    select(edge, date, new_ints, int_per_tp)  %>% unique() %>% 
+    group_by(date) %>% 
+    mutate(new_ints_date = sum(new_ints, na.rm = T)) %>% 
+    ungroup() %>% 
+    select(date, new_ints_date, int_per_tp) %>% unique() %>% 
+    gather(type, value, -date) %>% 
+    mutate(date = as.Date(date)) %>% 
+    ggplot(aes(x=date, y=value, colour=type)) +
+    geom_line(show.legend = T) + 
+    scale_x_date(breaks=TPs$date) +
+    theme_classic() + 
+    theme(axis.text.x = element_text(angle = 90))+
+    ggtitle("New interactions over time")
+```
+ + Weighted nteractions per time point: avergae, median, sd, per time point and show over time  
+```{r}
+edge_tab_weigth_occ %>% 
+  ungroup() %>% 
+  mutate(weight_edge = ifelse(weight_edge*presence == 0, NA, weight_edge*presence)) %>% 
+  select(edge, date, weight_edge) %>% 
+  group_by(date) %>% 
+  mutate(average = mean(weight_edge, na.rm = T), median = median(weight_edge, na.rm = T), variance = sd(weight_edge, na.rm = T)) %>% 
+  ungroup() %>% 
+  select(-edge, -weight_edge) %>% unique() %>% 
+  gather(variable, value, -date) %>% 
+  mutate(date = as.Date(date)) %>% 
+  ggplot(aes(x=date, y=value, colour=variable)) +
+  geom_line(show.legend = F) + 
+  scale_x_date(breaks=TPs$date) +
+  facet_wrap(~variable, ncol = 1) + 
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90))+
+  ggtitle("Weighted interactions: stats over time")
+  
+```
+ + Jaccard distances between time points, based on the presence/abscence of edges and the weight when there is edge  
+```{r message=FALSE, warning=FALSE}
+# get matrix to calculate distances
+# presence/absence
+# weighted network
+edge_tab_weigth_occ %>% 
+  mutate(weight_edge = ifelse(weight_edge*presence == 0, 0, weight_edge*presence)) %>% 
+  select(edge, date, weight_edge) %>% 
+  spread(date, weight_edge) %>% 
+  remove_rownames() %>% 
+  column_to_rownames("edge") %>% 
+  as.matrix() %>% 
+  t() -> mt_pa
+
+library(vegan)
+rm(list=c("jaccard_pa_bi", "lag_dist_pa_b", "jaccard_pa", "lag_dist_pa"))
+
+jaccard_pa_bi <- vegdist(mt_pa, method = "jaccard", diag=F, binary=T) %>% as.matrix()
+lag_dist_pa_bi <- jaccard_pa_bi[row(jaccard_pa_bi) == col(jaccard_pa_bi) + 1]
+lag_dist_pa_bi %>% 
+  as.tibble() %>% 
+  mutate(date = as.Date(colnames(jaccard_pa_bi)[-1])) -> lag_dist_pa_bi
+
+###
+jaccard_pa <- vegdist(mt_pa, method = "jaccard", diag=F) %>% as.matrix()
+lag_dist_pa <- jaccard_pa[row(jaccard_pa) == col(jaccard_pa) + 1]
+lag_dist_pa %>% 
+  as.tibble() %>% 
+  mutate(date = as.Date(colnames(jaccard_pa)[-1])) %>% 
+  full_join(lag_dist_pa_bi,., by = "date") %>% 
+  rename(jaccard_binary = value.x, jaccard_weighted = value.y) %>% 
+  gather(type, value, -date) %>% 
+  ggplot(aes(x=date, y=value, color=type)) +
+  geom_line(show.legend = T) + 
+  scale_x_date(breaks=TPs$date[-1]) +
+  facet_wrap(~type, ncol = 1) + 
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90))+
+  ggtitle("Jaccard distances (t-1)")
+```
+ + Entropy  
+```{r message=FALSE, warning=FALSE}
+#install.packages("entropy")
+library(entropy)
+edge_tab_weigth_occ %>% 
+  select(date, presence) %>%
+  group_by(date) %>% 
+  mutate(entropy = entropy(presence)) %>% 
+  ungroup() %>% 
+  select(date, entropy) %>% unique() %>% 
+  mutate(date = as.Date(date)) %>% 
+  gather(type, value, -date) %>% 
+  ggplot(aes(x=date, y=value)) +
+  geom_line(show.legend = F) + 
+  scale_x_date(breaks=TPs$date) +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90))+
+  ggtitle("Entropy per time point, based on presence/absence of interaction")
+  
+```
+
+###PH-host network: nodes
+```{r}
+# get node degree, but per part, since this is a bipartite net
+edge_tab_weigth_occ %>% 
+  select(edge, date, presence) %>% 
+  separate(edge, into = c("A", "B"), sep = "-")
+  
+
+```
+
+###Convert the ReGe-PH net to ReGe-ReGe net connected by common CRISPR interactions

@@ -1,0 +1,12 @@
+rule get_abundance:
+    input:
+        expand("Calculations/ContigLevel/{ts_sample}.{type}.contig_depth.txt", ts_sample = TS_SAMPLES, type = TYPES),
+        "%s/sample_list.tsv" % TS_DIR
+    output:
+        expand("Calculations/ContigLevel/ALL_{type}_contig_depth.txt", type = TYPES)
+    shell:
+        """
+        source {SRCDIR}/R_env.sh
+        ## sample list needs 2 columns and the names "Sample" and "Date" ** need to change this to make it more general 
+        Rscript {SRCDIR}/get_mge_abundance.R {input[1]} {OUTDIR}/Calculations/ContigLevel 
+        """

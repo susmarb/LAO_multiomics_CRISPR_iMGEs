@@ -1,0 +1,10 @@
+rule collect_mge_seqs:
+    input:
+        fa = "../CRISPR_prediction/db/ALL-mgmt.assembly.merged.fa",
+        ids = "ALL_MGEs.txt"
+    output:
+        idsfas = "ALL_MGEs.fa",
+    shell:
+        """
+        cat {input.ids}  | pullseq -i {input.fa}  -N > {output.idsfas}
+        """

@@ -1,0 +1,13 @@
+rule formatdb_representative_genomes:
+    input:
+        "%s" % HOST_DB
+    output:
+        "db/ALL_representative_genomes.fa",
+        "db/formatdb_repGenomes.done"
+    shell:
+        """
+        mkdir -p db
+        cp {input[0]} {output[0]}
+        formatdb -i {output[0]} -p F -n {output[0]}
+        touch {output[1]}
+        """ 

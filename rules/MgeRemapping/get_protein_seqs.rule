@@ -1,0 +1,21 @@
+#rule concatenate_all_faas:
+#    input:
+#        expand("{ts_dir}/Databases/Protein_DBS/per_sample_faas/{ts_sample}.faa", ts_dir = TS_DIR, ts_sample = TS_SAMPLES)
+#    output:
+#        "%s/Databases/Protein_DBS/per_sample_faas/ALL.faa" % TS_DIR
+#    shell:
+#        """
+#        cat {input} | cut -f1 -d ' ' > {output}
+#        """
+
+rule get_proteins:
+    input:
+        "Annotations/ALL_MGEs_annotation.gff",
+        "%s/Databases/Protein_DBS/per_sample_faas/ALL.faa" % TS_DIR
+    output:
+        "Annotations/ALL_MGEs_annotation.faa"
+    shell:
+        """
+        cut -f9 {input[0]} | cut -f1 -d ";" | sed -e 's/ID=//g' | sort | uniq | pullseq -i {input[1]} -N > {output[0]}
+        """
+

@@ -1,0 +1,13 @@
+rule run_vizbin_all_mge:
+    input:
+        "%s/ALL_MGEs-merged.fa" % IGE_DIR,
+    output:
+        "VizBin/ALL_MGEs-merged_gt1000.fa",
+        "VizBin/ALL_MGEs-merged_gt1000_vizbin.txt"
+    shell:
+        """
+        pullseq -i {input} -m 1000 > {output[0]}
+
+        ## need to install vizbin in local tools
+        java -Xmx{MEMTOTAL}G -jar /home/users/snarayanasamy/VizBin/VizBin-dist.jar -t {THREADS} -i {output[0]} -o {output[1]}
+        """

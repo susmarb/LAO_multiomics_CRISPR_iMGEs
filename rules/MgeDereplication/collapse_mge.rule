@@ -1,0 +1,16 @@
+rule collapse_mge:
+    input:
+        fa = "ALL_MGEs.fa"
+    output:
+        mfa = "ALL_MGEs-merged.fa",
+        clstr = "ALL_MGEs-merged.fa.clstr",
+        tbl = "ALL_MGEs-merged.fa.tbl",
+        tbl2seq = "ALL_MGEs-merged.fa.tbl2seq",
+    shell:
+        """
+        ## de-replicate them
+        cd-hit-est -T {THREADS} -M $(({MEMTOTAL}*1000)) -i {input.fa} -o {output.mfa} -aL 0.5 -aS 0.8 -d 0 
+
+       clstr_sql_tbl.pl {output.clstr} {output.tbl}
+       join -1 1 -2 3 -t$'\t' <(paste <(grep "^>" {output.clstr} | sed -e "s/>Cluster //g") <(grep "\*" {output.clstr} | cut -f2 -d " " | sed -e "s/>//g" | sed -e "s/\.\.\.//g")) <(cat {output.tbl}) > {output.tbl2seq}
+        """

@@ -1,0 +1,13 @@
+rule make_contig_to_class_table:
+    input:
+        pspcc = "ALL_protospacer_id_contigs.txt",
+        plasflow = "ALL_PlasFlow_id_contigs.txt",
+        cbar = "ALL_cBar_id_contigs.txt",
+        virsorter = "ALL_VirSorter_id_contigs.txt",
+        virfinder = "ALL_VirFinder_id_contigs.txt"
+    output:
+        all = "ALL_MGEcontigs_class.tsv"
+    shell:
+        """
+        Rscript {SRCDIR}/contig2type.R {input.pspcc} {input.plasflow} {input.cbar} {input.virfinder} {input.virsorter} {output.all} {VIRSORTER_DIR} {VIRFINDER_DIR}
+        """

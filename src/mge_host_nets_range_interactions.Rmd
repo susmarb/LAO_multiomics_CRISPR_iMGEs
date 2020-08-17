@@ -1,0 +1,170 @@
+---
+title: "MGE_host_nets_range_interactions"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Installing/loading libraries
+```{r hello}
+packs <- c("sna", "tsna", "ndtv", "tidyverse", "Hmisc", "vegan", "psych")
+for (i in 1:length(packs)){library(packs[i], character.only = TRUE)}
+```
+
+### data
+```{r}
+indir_root <- "/Users/susana.martinez/Documents/LAO_TS_analysis/MGE_analysis/Host_CRISPR_MGE_analysis/Networks"
+
+# nodes table to be extended
+#nodes.in <- paste(indir_root, "Nets_and_node_info_files/Final_nodes_spreadMGMT.tsv", sep = "/")
+nodes_pl <- read_tsv(paste(indir_root, "Nets_and_node_info_files/Final_nodes_spreadMGMT_plasmid.tsv", sep = "/"))
+nodes_ph <- read_tsv(paste(indir_root, "Nets_and_node_info_files/Final_nodes_spreadMGMT_phage.tsv", sep = "/"))
+#
+# crispr nets
+pl_net <- read_tsv(paste(indir_root, "Nets_and_node_info_files/Final_rbin_plasmidnet.tsv", sep = "/"))
+ph_net <- read_tsv(paste(indir_root, "Nets_and_node_info_files/Final_rbin_phagenet.tsv", sep = "/"))
+
+```
+### functions
+```{r}
+get_mge_ints <- function(pl_net){
+rege_nodes <- unique(pl_net$rbin)
+rm(tb2save)
+for (rnode in rege_nodes){
+  pl_net %>% 
+  filter(rbin == rnode) %>% 
+  full_join(., pl_net, by = "pspcc") %>% 
+  filter(rbin.x != rbin.y) %>% 
+  map(unique) -> tmp_list
+
+    if (length(unlist(tmp_list[1])) != 0) {
+      rege <- as_tibble(tmp_list[1])
+      n_mges <- as_tibble(length(tmp_list$pspcc)) %>% mutate(n_int_mges = value) %>% select(-value)
+      reges_2 <- unlist(tmp_list[3]) 
+      n_reges_2 <- as_tibble(length(tmp_list$rbin.y)) %>% mutate(n_int_reges = value) %>% select(-value)
+      line2add <- cbind(rege, n_mges, n_reges_2) %>% 
+        mutate(int_reges = paste(reges_2, collapse = ";"))
+      ifelse(exists("tb2save"), tb2save <- rbind(tb2save, line2add), tb2save <- line2add)
+    }else{
+        line2add <- c(rnode, 0, 0, NA) 
+        ifelse(exists("tb2save"), tb2save <- rbind(tb2save, line2add), tb2save <- line2add)
+    }
+  as_tibble(tb2save) %>% arrange(rbin.x) %>% unique() %>% 
+  mutate(n_int_mges = as.numeric(n_int_mges)) %>% 
+  mutate(n_int_reges = as.numeric(n_int_reges)) -> tb2save
+}
+return(tb2save)
+}
+```
+
+### Static; get interacting reges via common mobile genetic elements: plasmids
+```{r}
+# plasmids
+pl_ints <- get_mge_ints(pl_net)
+write_tsv(pl_ints, paste(indir_root,"Final_rbin_plasmidnet_indirect_interactions_reges.tsv", sep = "/"))
+# mean, meadian, sd
+pl_ints_stats <- pl_ints %>% 
+  mutate(mean_reges = mean(n_int_reges), median_reges = median(n_int_reges), sd_reges = sd(n_int_reges)) %>% 
+  select(mean_reges, median_reges, sd_reges) %>% unique()
+write_tsv(pl_ints_stats, paste(indir_root, "Final_rbin_plasmidnet_indirect_interactions_reges_stat.tsv", sep = "/"))  
+
+full_join(pl_net, pl_net, by = "pspcc") %>% 
+  select(rbin.x, rbin.y) %>% unique() %>% 
+  write_tsv(., paste(indir_root, "rege_rege_plasmid_net.tsv", sep = "/"))
+
+# visualization
+# distribution of node degree (rege-mge and rege-rege)
+pl_ints %>% map_dfr(mean) %>% select(2,3) %>% gather(cond, degree_mean) -> cdat
+as.tibble(pl_ints) %>% 
+  gather(cond, degree, -rbin.x, -int_reges) %>% 
+  select(rbin.x, degree, cond) %>% 
+  ggplot(aes(x=degree, colour=cond)) + 
+    geom_density() +
+    geom_vline(data=cdat, aes(xintercept=degree_mean,  colour=cond),
+               linetype="dashed", size=1)  
+as.tibble(pl_ints) %>% 
+  gather(cond, degree, -rbin.x, -int_reges) %>% 
+  select(rbin.x, degree, cond) %>% 
+ggplot(aes(x = degree, y = rbin.x, color = cond)) +
+  geom_point(alpha = .4) 
+```
+### Static; get interacting reges via common mobile genetic elements: phages
+```{r}
+# phages
+#ph_ints <- get_mge_ints(ph_net)
+
+rege_nodes <- unique(ph_net$rbin)
+rm(tb2save)
+for (rnode in rege_nodes){
+  ph_net %>% 
+  filter(rbin == rnode) %>% 
+  full_join(., ph_net, by = "pspcc") %>% 
+  filter(rbin.x != rbin.y) %>% 
+  map(unique) -> tmp_list
+
+    if (length(unlist(tmp_list[1])) != 0) {
+      rege <- as_tibble(tmp_list[1])
+      n_mges <- as_tibble(length(tmp_list$pspcc)) %>% mutate(n_int_mges = value) %>% select(-value)
+      reges_2 <- unlist(tmp_list[3]) 
+      n_reges_2 <- as_tibble(length(tmp_list$rbin.y)) %>% mutate(n_int_reges = value) %>% select(-value)
+      line2add <- cbind(rege, n_mges, n_reges_2) %>% 
+        mutate(int_reges = paste(reges_2, collapse = ";"))
+      ifelse(exists("tb2save"), tb2save <- rbind(tb2save, line2add), tb2save <- line2add)
+    }else{
+        line2add <- c(rnode, 0, 0, NA) 
+        ifelse(exists("tb2save"), tb2save <- rbind(tb2save, line2add), tb2save <- line2add)
+    }
+  as_tibble(tb2save) %>% arrange(rbin.x) %>% unique() %>% 
+  mutate(n_int_mges = as.numeric(n_int_mges)) %>% 
+  mutate(n_int_reges = as.numeric(n_int_reges)) -> tb2save
+  
+}
+
+write_tsv(tb2save, paste(indir_root,"Final_rbin_phagenet_indirect_interactions_reges.tsv", sep = "/"))
+
+
+# mean, meadian, sd
+ph_ints_stats <- tb2save %>% 
+  mutate(mean_reges = mean(n_int_reges), median_reges = median(n_int_reges), sd_reges = sd(n_int_reges)) %>% 
+  select(mean_reges, median_reges, sd_reges) %>% unique()
+write_tsv(ph_ints_stats, paste(indir_root, "Final_rbin_phagenet_indirect_interactions_reges_stat.tsv", sep = "/"))  
+
+full_join(ph_net, ph_net, by = "pspcc") %>% 
+  select(rbin.x, rbin.y) %>% unique() %>% 
+  write_tsv(., paste(indir_root, "rege_rege_phage_net.tsv", sep = "/"))
+
+# visualization
+# distribution of node degree (rege-mge and rege-rege)
+ph_ints %>% map_dfr(mean) %>% select(2,3) %>% gather(cond, degree_mean) -> cdat
+as.tibble(ph_ints) %>% 
+  gather(cond, degree, -rbin.x, -int_reges) %>% 
+  select(rbin.x, degree, cond) %>% 
+  ggplot(aes(x=degree, colour=cond)) + 
+    geom_density() +
+    geom_vline(data=cdat, aes(xintercept=degree_mean,  colour=cond),
+               linetype="dashed", size=1)  
+as.tibble(ph_ints) %>% 
+  gather(cond, degree, -rbin.x, -int_reges) %>% 
+  select(rbin.x, degree, cond) %>% 
+ggplot(aes(x = degree, y = rbin.x, color = cond)) +
+  geom_point(alpha = .4) 
+```
+
+### Dynamic; get interacting reges via common mobile genetic elements: plasmids
+```{r}
+# network over time; rbin/pspcc/dates where they interact
+pl_net %>% 
+  inner_join(., nodes_pl, by = c("rbin" = "node")) %>% select(-type) %>% 
+  gather(date_host, omic_host, -rbin, -pspcc) %>% 
+  inner_join(., nodes_pl, by = c("pspcc" = "node")) %>% select(-type) %>% 
+  gather(date_mge, omic_mge, -rbin, -pspcc, -date_host, -omic_host) %>% 
+  filter(date_host == date_mge) %>% select(-date_host) %>% rename(date = date_mge) %>% 
+  filter(!is.na(omic_host) & !is.na(omic_mge)) %>% 
+  select(-starts_with("omic")) %>% 
+  spread()
+  
+  
+
+```

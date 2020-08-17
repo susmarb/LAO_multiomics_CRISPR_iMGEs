@@ -1,0 +1,19 @@
+rule get_annotations:
+    input:
+        ids = "%s/ALL_MGEs.txt" % IGE_DIR
+    output:
+        ann = "Annotations/ALL_MGEs_annotation.gff",
+        done = "annotation.done"
+    shell:
+        """
+        rm -f {output.ann} 
+        cat {input.ids} | \
+        parallel 'SAMPLE=`echo {{}} | \
+        cut -f1 -d "_"`; BIN=`echo {{}} | \
+        cut -f2 -d "_"`; CONTIG=`echo {{}} | \
+        cut -f4 -d "_"`; grep -Fw "contig_${{CONTIG}}" {TS_DIR}/${{SAMPLE}}/Analysis/annotation/annotation.filt.gff | \
+        sed -e "s/^contig_/${{SAMPLE}}_${{BIN}}_contig_/g" | \
+        sed -e "s/ID=PROKKA_/ID=${{SAMPLE}}_${{BIN}}_PROKKA_/g"' > {output.ann}
+        
+        touch {output.done}
+        """

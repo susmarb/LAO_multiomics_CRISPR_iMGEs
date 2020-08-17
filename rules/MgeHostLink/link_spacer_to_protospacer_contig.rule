@@ -1,0 +1,14 @@
+rule link_spacers_and_protospacers:
+    input:
+        pspcc = "%s/protospacers/ALL_pspcc_qcov95_pident95.gff" % CRISPR_ELEMENTS_DIR,
+        sp = "%s/spacers/ReSpa2MeSpa.tsv" % CRISPR_ELEMENTS_DIR,
+        sample2date = "%s/sample_list.tsv" % TS_DIR
+    output:
+        sp2pspcc = "ALL_Spacers_to_PSpCC.tsv",
+        done = "link_sp2pspcc.done"
+    shell:
+        """
+        source {SRCDIR}/R_env.sh
+        Rscript {SRCDIR}/link_spacer_to_protospacer_contig.R {input.pspcc} {input.sp} {input.sample2date} {output.sp2pspcc}
+        touch {output.done}
+        """

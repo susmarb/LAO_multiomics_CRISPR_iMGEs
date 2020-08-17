@@ -1,0 +1,25 @@
+rule merge_spacers:
+    input:
+        expand("ALL/{ts_sample}/crass_mt-reads/crass_mt-reads_{ts_sample}_spacers.fa", ts_sample = TS_SAMPLES),
+        expand("ALL/{ts_sample}/crass_mg-reads/crass_mg-reads_{ts_sample}_spacers.fa", ts_sample = TS_SAMPLES),
+        expand("ALL/{ts_sample}/metacrt_contigs-mt/metacrt_contigs-mt_spacers.fa", ts_sample = TS_SAMPLES),
+        "ALL/metaCRT/metacrt_contigs-mgmt_spacers.fa"
+    output:
+        "ALL/spacers/ALL_spacers.fa",
+        "ALL/spacers/ALL_spacers-merged.fa",
+        "ALL/spacers/ALL_spacers-merged.fa.clstr",
+        "ALL/spacers/ALL_spacers-merged.fa.tbl",
+        "ALL/spacers/ALL_spacers-merged.fa.tbl2seq",
+        "ALL/spacers/ReSpa2MeSpa.tsv"
+    shell:
+        """
+        cat {input} > {output[0]}
+        sed -i "s/^>_/>/g" {output[0]}
+
+        cd-hit-est -i {output[0]} -o {output[1]} -c 0.9 -d 0 -s 1 -aL 1 -aS 1
+
+        # This provides a tables for the mappings for the clustered sequences
+        clstr_sql_tbl.pl {output[2]} {output[3]}
+        join -1 1 -2 3 -t$'\t' <(paste <(grep "^>" {output[2]} | sed -e "s/>Cluster //g") <(grep "\*" {output[2]} | cut -f2 -d " " | sed -e "s/>//g" | sed -e "s/\.\.\.//g")) <(cat {output[3]}) > {output[4]}
+        cat {output[4]} | cut -f 2,3 > {output[5]}        
+        """

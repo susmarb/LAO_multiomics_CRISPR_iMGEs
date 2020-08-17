@@ -1,0 +1,10 @@
+rule get_spacer2gene_target:
+    input:
+        "Annotations/ALL_MGEs_annotation.gff",
+        "../CRISPR_prediction/ALL/protospacers/ALL_pspcc_qcov95_pident95.gff"
+    output:
+        "Annotations/ALL_MGEs_annotation2protospacer.tsv"
+    shell:
+        """
+        bedtools intersect -a {input[0]} -b <(cut -f1,4,5 {input[1]} | grep -v ^#) >> {output[0]}
+        """

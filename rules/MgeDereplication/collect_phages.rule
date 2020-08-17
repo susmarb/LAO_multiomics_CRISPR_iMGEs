@@ -1,0 +1,15 @@
+rule collect_phages:
+    input:
+        "%s" % VIRSORTER_DIR,
+        "%s" % VIRFINDER_DIR
+    output:
+        idsvirs = "ALL_VirSorter_id_contigs.txt",
+        idsvirf = "ALL_VirFinder_id_contigs.txt",
+    shell:
+        """
+        ## contigs of Virsorter results
+        ls -dQ {VIRSORTER_DIR}/*/Predicted_viral_sequences/VIRSorter_cat-*.fasta | xargs cat | grep ">" | sed -e "s/>VIRSorter_//g" | sed -r "s/-cat_[1-9]//g" | sed -e "s/-circular//g" | sort | uniq > {output.idsvirs}
+
+        ## contigs of VirFinder results
+        cat {VIRFINDER_DIR}/*/VirFinder_phages_mgmt_pval005.tsv | awk '{{print$1}}' | sort | uniq > {output.idsvirf}
+        """

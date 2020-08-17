@@ -1,0 +1,15 @@
+rule run_virsorter:
+    input:
+        "%s/Assemblies/{ts_sample}-mgmt.assembly.merged.fa" % TS_DIR,
+    output:
+        "VirSorter/{ts_sample}/Readme.txt",
+        "VirSorter/{ts_sample}/VIRSorter_global-phage-signal.csv",
+        "VirSorter/{ts_sample}/{ts_sample}_mgmt.done"
+    shell:
+        """
+        source activate virsorter
+        
+        {ESB_TOOLS_DIR}/VirSorter/VirSorter/wrapper_phage_contigs_sorter_iPlant.pl -f {input} --db 1 --wdir {MGE_OUTDIR}/VirSorter/{wildcards.ts_sample} --ncpu 1 --data-dir {MGE_OUTDIR}/VirSorter/{wildcards.ts_sample}
+        source deactivate
+        touch {output}
+        """

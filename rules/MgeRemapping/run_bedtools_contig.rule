@@ -1,0 +1,48 @@
+rule call_contig_depth:
+    input:
+        "Mappings/{ts_sample}.{type}.reads.sorted.bam",
+        "Mappings/{ts_sample}.{type}.reads.sorted.bam.bai",
+        "Index/ALL_MGEs-merged.fa"
+    output:
+        "Calculations/ContigLevel/{ts_sample}.{type}.contig_coverage.txt",
+        "Calculations/ContigLevel/{ts_sample}.{type}.contig_depth.txt",
+        "Calculations/ContigLevel/{ts_sample}.{type}.contig_flagstat.txt"
+    shell:
+        """
+        mkdir -p Calculations/ContigLevel
+
+        echo "[x]  COVERAGE AND DEPTH `date +"%Y/%m/%d %H:%M:%S"`"
+        echo "Creating genome file ..."
+        if [[ ! -f {input[2]}.fai ]]
+        then
+          echo "No fasta index! Creating one."
+          samtools faidx {input[2]}
+        fi
+        cat {input[2]}.fai | awk '{{print $1 \"\t0\t\" $2}}' > {input[2]}.bed3
+        echo "Done creating bed file"
+
+        echo "Running BEDTools coverage calculation ..."
+        coverageBed -abam {input[0]} -b {input[2]}.bed3 > {output[0]}
+        echo "Coverage calculation done"
+        echo "Running BEDTools for average depth in each position"
+        TMP_DEPTH=$(mktemp --tmpdir={TMPDIR} -t "depth_file_XXXXXX.txt")
+        genomeCoverageBed -ibam {input[0]} | grep -v "genome" > $TMP_DEPTH
+        echo "Depth calculation done"
+
+        ## This method of depth calculation was adapted and modified from the CONCOCT code
+        awk -v OFS='\t' 'BEGIN {{pc=""}}
+        {{
+        c=$1;
+        if (c == pc) {{
+        cov=cov+$2*$5;
+        }} else {{
+        print pc,cov;
+        cov=$2*$5;
+        pc=c}}
+        }} END {{print pc,cov}}' $TMP_DEPTH | tail -n +2 > {output[1]}
+
+        echo "Remove the temporary file"
+        rm $TMP_DEPTH
+        echo "flagstat"
+        samtools flagstat {input[0]} | cut -f1 -d ' ' > {output[2]}
+        """
